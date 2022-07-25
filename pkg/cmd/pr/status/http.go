@@ -189,7 +189,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 func pullRequestFragment(httpClient *http.Client, hostname string) (string, error) {
 	fields := []string{
 		"number", "title", "state", "url", "isDraft", "isCrossRepository",
-		"headRefName", "headRepositoryOwner", "mergeStateStatus",
+		"headRefName", "headRepositoryOwner", "mergeable", "mergeStateStatus",
 		"statusCheckRollup", "requiresStrictStatusChecks",
 	}
 	reviewFields := []string{"reviewDecision", "latestReviews"}

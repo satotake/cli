@@ -264,6 +264,10 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 				fmt.Fprint(w, cs.Green(fmt.Sprintf("✓ %s Approved", s)))
 			}
 
+			if pr.Mergeable == "CONFLICTING" {
+				fmt.Fprintf(w, " %s", cs.Red("× Merge conflicts"))
+			}
+
 			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {
 				switch pr.MergeStateStatus {
 				case "BEHIND":
