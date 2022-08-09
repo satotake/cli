@@ -269,11 +269,7 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-			},
-			httpStubs: func(reg *httpmock.Registry, _ *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 			},
 			assert: func(output test.CmdOut, err error, t *testing.T) {
 				assert.NoError(t, err)
@@ -286,7 +282,6 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "nontty",
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
@@ -300,9 +295,6 @@ func Test_createRun(t *testing.T) {
 							assert.Equal(t, "master", input["baseRefName"])
 							assert.Equal(t, "feature", input["headRefName"])
 						}))
-			},
-			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
 			},
 			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
 				return CreateOptions{
@@ -331,7 +323,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.StubRepoResponse("OWNER", "REPO")
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -351,7 +342,6 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
@@ -378,7 +368,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.StubRepoResponse("OWNER", "REPO")
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -400,7 +389,6 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 			},
@@ -426,7 +414,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.StubRepoResponse("OWNER", "REPO")
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -451,7 +438,6 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
 				cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
@@ -496,7 +482,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
@@ -509,7 +494,6 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register("git status", 0, "")
 				cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 1, "") // determineTrackingBranch
 				cs.Register("git show-ref --verify", 0, heredoc.Doc(`
 		deadbeef HEAD
@@ -535,7 +519,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
@@ -549,7 +532,6 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register("git status", 0, "")
 				cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 0, heredoc.Doc(`
 		branch.feature.remote origin
 		branch.feature.merge refs/heads/my-feat2
@@ -577,7 +559,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestTemplates\b`),
 					httpmock.StringResponse(`
@@ -600,7 +581,6 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
-				cs.Register(`git status --porcelain`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Choose a template").
@@ -634,7 +614,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 					httpmock.StringResponse(`
@@ -724,9 +703,6 @@ func Test_createRun(t *testing.T) {
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},
-			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
-			},
 			assert: func(output test.CmdOut, err error, t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
@@ -745,12 +721,6 @@ func Test_createRun(t *testing.T) {
 					Finder:        shared.NewMockFinder("feature", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
 				}, func() {}
 			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
-			},
-			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
-			},
 			assert: func(_ test.CmdOut, err error, t *testing.T) {
 				assert.EqualError(t, err, "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123")
 			},
@@ -764,7 +734,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.StubRepoResponse("OWNER", "REPO")
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -772,7 +741,6 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
@@ -800,7 +768,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.StubRepoResponse("OWNER", "REPO")
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -828,7 +795,6 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
@@ -855,7 +821,6 @@ func Test_createRun(t *testing.T) {
 				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestTemplates\b`),
 					httpmock.StringResponse(`
@@ -877,7 +842,6 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
 				cs.Register(`git rev-parse --show-toplevel`, 0, "")
 			},
@@ -897,7 +861,6 @@ func Test_createRun(t *testing.T) {
 			name: "recover",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 					httpmock.StringResponse(`
@@ -928,7 +891,6 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
@@ -962,11 +924,7 @@ func Test_createRun(t *testing.T) {
 		},
 		{
 			name: "web long URL",
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
-			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 			},
 			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
@@ -992,6 +950,7 @@ func Test_createRun(t *testing.T) {
 			branch := "feature"
 
 			reg := initFakeHTTP()
+			reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 			defer reg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg, t)
@@ -1006,6 +965,7 @@ func Test_createRun(t *testing.T) {
 
 			cs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
+			cs.Register(`git status --porcelain`, 0, "")
 
 			if tt.cmdStubs != nil {
 				tt.cmdStubs(cs)
