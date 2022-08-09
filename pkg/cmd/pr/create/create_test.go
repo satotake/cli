@@ -258,7 +258,8 @@ func Test_createRun(t *testing.T) {
 		askStubs  func(*prompt.AskStubber) // TODO eventually migrate to PrompterMock
 		httpStubs func(*httpmock.Registry, *testing.T)
 		assert    func(test.CmdOut, error, *testing.T)
-		tty       bool // TODO ideally this wouldn't be necessary
+		// TODO consider expectedOut, expectedErr, expectedErrOut
+		tty bool
 	}{
 		{
 			name: "nontty web",
@@ -946,7 +947,6 @@ func Test_createRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO do i ultimately need this
 			branch := "feature"
 
 			reg := initFakeHTTP()
