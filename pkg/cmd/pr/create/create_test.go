@@ -250,24 +250,23 @@ func initFakeHTTP() *httpmock.Registry {
 	return &httpmock.Registry{}
 }
 
-func TestPRCreate(t *testing.T) {
-	cases := []struct {
-		name     string
-		setup    func(*testing.T) (string, func()) // TODO change to return opts
-		cmdStubs func(*run.CommandStubber)
-		//promptStubs func(*prompter.PrompterMock)
-		askStubs        func(*prompt.AskStubber) // TODO eventually migrate to PrompterMock ^
-		httpStubs       func(*httpmock.Registry, *testing.T)
-		remotes         func() context.Remotes
-		assert          func(test.CmdOut, error, *testing.T)
-		branch          string // TODO eventually port to opts fully
-		tty             bool   // TODO eventually port to opts fully
-		rootDirOverride string
+func Test_createRun(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupOpts func(*testing.T) (CreateOptions, func())
+		cmdStubs  func(*run.CommandStubber)
+		askStubs  func(*prompt.AskStubber) // TODO eventually migrate to PrompterMock
+		httpStubs func(*httpmock.Registry, *testing.T)
+		assert    func(test.CmdOut, error, *testing.T)
+		tty       bool // TODO ideally this wouldn't be necessary
 	}{
 		{
 			name: "nontty web",
-			setup: func(_ *testing.T) (string, func()) {
-				return `--web --head=feature`, func() {}
+			setupOpts: func(t *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					WebMode:    true,
+					HeadBranch: "feature",
+				}, func() {}
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git status --porcelain`, 0, "")
@@ -305,8 +304,14 @@ func TestPRCreate(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git status --porcelain`, 0, "")
 			},
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t "my title" -b "my body" -H feature`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					BodyProvided:  true,
+					Title:         "my title",
+					Body:          "my body",
+					HeadBranch:    "feature",
+				}, func() {}
 			},
 			assert: func(output test.CmdOut, err error, t *testing.T) {
 				require.NoError(t, err)
@@ -317,8 +322,13 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "survey",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t "my title" -b "my body"`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					BodyProvided:  true,
+					Title:         "my title",
+					Body:          "my body",
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -359,8 +369,13 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "no maintainer modify",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t "my title" -b "my body" --no-maintainer-edit`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					BodyProvided:  true,
+					Title:         "my title",
+					Body:          "my body",
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -402,8 +417,13 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "create fork",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t title -b body`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					BodyProvided:  true,
+					Title:         "title",
+					Body:          "body",
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -449,26 +469,31 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "pushed to non base repo",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t title -b body`, func() {}
-			},
-			remotes: func() context.Remotes {
-				return context.Remotes{
-					{
-						Remote: &git.Remote{
-							Name:     "upstream",
-							Resolved: "base",
-						},
-						Repo: ghrepo.New("OWNER", "REPO"),
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					BodyProvided:  true,
+					Title:         "title",
+					Body:          "body",
+					Remotes: func() (context.Remotes, error) {
+						return context.Remotes{
+							{
+								Remote: &git.Remote{
+									Name:     "upstream",
+									Resolved: "base",
+								},
+								Repo: ghrepo.New("OWNER", "REPO"),
+							},
+							{
+								Remote: &git.Remote{
+									Name:     "origin",
+									Resolved: "base",
+								},
+								Repo: ghrepo.New("monalisa", "REPO"),
+							},
+						}, nil
 					},
-					{
-						Remote: &git.Remote{
-							Name:     "origin",
-							Resolved: "base",
-						},
-						Repo: ghrepo.New("monalisa", "REPO"),
-					},
-				}
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -501,8 +526,13 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "pushed to different branch name",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t title -b body`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					BodyProvided:  true,
+					Title:         "title",
+					Body:          "body",
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -538,10 +568,14 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "non legacy template",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t "my title" -H feature`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided:   true,
+					Title:           "my title",
+					HeadBranch:      "feature",
+					RootDirOverride: "./fixtures/repoWithNonLegacyPRTemplates",
+				}, func() {}
 			},
-			rootDirOverride: "./fixtures/repoWithNonLegacyPRTemplates",
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.Register(
@@ -585,8 +619,19 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "metadata",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t TITLE -b BODY -H feature -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r monalisa -r /core -r /robots`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					Title:         "TITLE",
+					BodyProvided:  true,
+					Body:          "BODY",
+					HeadBranch:    "feature",
+					Assignees:     []string{"monalisa"},
+					Labels:        []string{"bug", "todo"},
+					Projects:      []string{"roadmap"},
+					Reviewers:     []string{"hubot", "monalisa", "/core", "/robots"},
+					Milestone:     "big one.oh",
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -690,15 +735,21 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "already exists",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t title -b body -H feature`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					BodyProvided:  true,
+					Title:         "title",
+					Body:          "body",
+					HeadBranch:    "feature",
+					Finder:        shared.NewMockFinder("feature", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git status --porcelain`, 0, "")
-				shared.RunCommandFinder("feature", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO"))
 			},
 			assert: func(_ test.CmdOut, err error, t *testing.T) {
 				assert.EqualError(t, err, "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123")
@@ -707,8 +758,10 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "web",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `--web`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					WebMode: true,
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -740,8 +793,11 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "web project",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `--web -p Triage`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					WebMode:  true,
+					Projects: []string{"Triage"},
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -791,8 +847,12 @@ func TestPRCreate(t *testing.T) {
 		{
 			name: "draft",
 			tty:  true,
-			setup: func(_ *testing.T) (string, func()) {
-				return `-t "my title" -H feature`, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				return CreateOptions{
+					TitleProvided: true,
+					Title:         "my title",
+					HeadBranch:    "feature",
+				}, func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -876,7 +936,7 @@ func TestPRCreate(t *testing.T) {
 				as.StubPrompt("Body").AnswerDefault()
 				as.StubPrompt("What's next?").AnswerDefault()
 			},
-			setup: func(t *testing.T) (string, func()) {
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
 				tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
 				assert.NoError(t, err)
 				state := prShared.IssueMetadataState{
@@ -890,8 +950,10 @@ func TestPRCreate(t *testing.T) {
 
 				_, err = tmpfile.Write(data)
 				assert.NoError(t, err)
-				cli := fmt.Sprintf("--recover '%s' -Hfeature", tmpfile.Name())
-				return cli, func() { tmpfile.Close() }
+				return CreateOptions{
+					RecoverFile: tmpfile.Name(),
+					HeadBranch:  "feature",
+				}, func() {}
 			},
 			assert: func(output test.CmdOut, err error, t *testing.T) {
 				assert.NoError(t, err)
@@ -907,30 +969,32 @@ func TestPRCreate(t *testing.T) {
 				cs.Register(`git status --porcelain`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 			},
-			setup: func(t *testing.T) (string, func()) {
-				longBodyFile := filepath.Join(t.TempDir(), "long-body.txt")
-				err := os.WriteFile(longBodyFile, make([]byte, 9216), 0600)
-				assert.NoError(t, err)
-				cli := fmt.Sprintf("--body-file '%s' --web --head=feature", longBodyFile)
-				return cli, func() {}
+			setupOpts: func(_ *testing.T) (CreateOptions, func()) {
+				longBody := make([]byte, 9216)
+				for x := 0; x < 9216; x++ {
+					longBody = append(longBody, 'a')
+				}
+				return CreateOptions{
+					Body:         string(longBody),
+					BodyProvided: true,
+					WebMode:      true,
+					HeadBranch:   "feature",
+				}, func() {}
 			},
 			assert: func(_ test.CmdOut, err error, t *testing.T) {
 				assert.EqualError(t, err, "cannot open in browser: maximum URL length exceeded")
 			},
 		},
 	}
-	for _, tt := range cases {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// TODO do i ultimately need this
 			branch := "feature"
-			if tt.branch != "" {
-				branch = tt.branch
-			}
-			shared.RunCommandFinder(branch, nil, nil)
 
-			http := initFakeHTTP()
-			defer http.Verify(t)
+			reg := initFakeHTTP()
+			defer reg.Verify(t)
 			if tt.httpStubs != nil {
-				tt.httpStubs(http, t)
+				tt.httpStubs(reg, t)
 			}
 
 			//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
@@ -947,26 +1011,49 @@ func TestPRCreate(t *testing.T) {
 				tt.cmdStubs(cs)
 			}
 
-			var remotes context.Remotes
-			if tt.remotes != nil {
-				remotes = tt.remotes()
-			}
-
-			cli := ""
-			cleanSetup := func() {}
-			if tt.setup != nil {
-				cli, cleanSetup = tt.setup(t)
-			}
+			opts, cleanSetup := tt.setupOpts(t)
 			defer cleanSetup()
 
-			var output *test.CmdOut
-			var err error
-			if tt.rootDirOverride != "" {
-				output, err = runCommandWithRootDirOverridden(http, remotes, branch, tt.tty, cli, tt.rootDirOverride)
-			} else {
-				output, err = runCommand(http, remotes, branch, tt.tty, cli)
+			ios, _, stdout, stderr := iostreams.Test()
+			// TODO do i need to bother with this
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			browser := &cmdutil.TestBrowser{}
+			opts.IO = ios
+			opts.Browser = browser
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			if opts.Remotes == nil {
+				opts.Remotes = func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{
+								Name:     "origin",
+								Resolved: "base",
+							},
+							Repo: ghrepo.New("OWNER", "REPO"),
+						},
+					}, nil
+				}
+			}
+			opts.Branch = func() (string, error) {
+				return branch, nil
+			}
+			if opts.Finder == nil {
+				opts.Finder = shared.NewMockFinder(branch, nil, nil)
 			}
 
+			err := createRun(&opts)
+			output := &test.CmdOut{
+				OutBuf:     stdout,
+				ErrBuf:     stderr,
+				BrowsedURL: browser.BrowsedURL(),
+			}
 			tt.assert(*output, err, t)
 		})
 	}
