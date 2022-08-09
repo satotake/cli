@@ -1,10 +1,8 @@
 package create
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -181,73 +179,6 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.HeadBranch, opts.HeadBranch)
 		})
 	}
-}
-
-func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
-	return runCommandWithRootDirOverridden(rt, remotes, branch, isTTY, cli, "")
-}
-
-func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
-	ios, _, stdout, stderr := iostreams.Test()
-	ios.SetStdoutTTY(isTTY)
-	ios.SetStdinTTY(isTTY)
-	ios.SetStderrTTY(isTTY)
-
-	browser := &cmdutil.TestBrowser{}
-	factory := &cmdutil.Factory{
-		IOStreams: ios,
-		Browser:   browser,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: rt}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-		Remotes: func() (context.Remotes, error) {
-			if remotes != nil {
-				return remotes, nil
-			}
-			return context.Remotes{
-				{
-					Remote: &git.Remote{
-						Name:     "origin",
-						Resolved: "base",
-					},
-					Repo: ghrepo.New("OWNER", "REPO"),
-				},
-			}, nil
-		},
-		Branch: func() (string, error) {
-			return branch, nil
-		},
-	}
-
-	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
-		opts.RootDirOverride = rootDir
-		return createRun(opts)
-	})
-	cmd.PersistentFlags().StringP("repo", "R", "", "")
-
-	argv, err := shlex.Split(cli)
-	if err != nil {
-		return nil, err
-	}
-	cmd.SetArgs(argv)
-
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-
-	_, err = cmd.ExecuteC()
-	return &test.CmdOut{
-		OutBuf:     stdout,
-		ErrBuf:     stderr,
-		BrowsedURL: browser.BrowsedURL(),
-	}, err
-}
-
-func initFakeHTTP() *httpmock.Registry {
-	return &httpmock.Registry{}
 }
 
 func Test_createRun(t *testing.T) {
@@ -949,7 +880,7 @@ func Test_createRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			branch := "feature"
 
-			reg := initFakeHTTP()
+			reg := &httpmock.Registry{}
 			reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 			defer reg.Verify(t)
 			if tt.httpStubs != nil {
